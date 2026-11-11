@@ -1,0 +1,111 @@
+<!--
+  HELYS – custom Wazuh rules (lab environment)
+  Healthcare-oriented detections, mapped to MITRE ATT&CK where relevant.
+  Place in /var/ossec/etc/rules/local_rules.xml and test with /var/ossec/bin/wazuh-logtest.
+  Note: 1.1.1.1 in rule 100001 is a placeholder test address.
+-->
+
+<group name="local,syslog,sshd,windows,sysmon,powershell,malware,healthcare,nginx,web,dmz,">
+
+  <!-- SSH authentication failure from a watched address (test rule) -->
+  <rule id="100001" level="5">
+    <if_sid>5716</if_sid>
+    <srcip>1.1.1.1</srcip>
+    <description>sshd: authentication failed from IP 1.1.1.1</description>
+    <group>authentication_failed,pci_dss_10.2.4,pci_dss_10.2.5</group>
+  </rule>
+
+  <!-- File Integrity Monitoring on the patient data directory -->
+  <rule id="100002" level="12">
+    <if_group>syscheck</if_group>
+    <match>/opt/patient_data</match>
+    <description>CRITICAL: Patient data directory modified</description>
+    <mitre>
+      <id>T1565</id>
+    </mitre>
+    <group>healthcare,hipaa,integrity</group>
+  </rule>
+
+  <!-- PowerShell encoded command (Windows PowerShell logs) -->
+  <rule id="100201" level="8">
+    <if_sid>68009</if_sid>
+    <field name="win.eventdata.Payload" type="pcre2">(?i)CommandInvocation</field>
+    <field name="win.system.message" type="pcre2">(?i)EncodedCommand|FromBase64String|EncodedArguments|-e\b|-enc\b|-en\b</field>
+    <description>Encoded command executed via PowerShell</description>
+    <mitre>
+      <id>T1059.001</id>
+    </mitre>
+  </rule>
+
+  <!-- Mimikatz execution (Sysmon Event ID 1 - process creation) -->
+  <rule id="100004" level="15">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\mimikatz\.exe$</field>
+    <description>Mimikatz usage detected</description>
+    <mitre>
+      <id>T1003</id>
+    </mitre>
+  </rule>
+
+  <!-- Web attacks on the DMZ Nginx server -->
+  <rule id="300001" level="12">
+    <if_matched_sid>31101</if_matched_sid>
+    <field name="data.url" type="pcre2">(\.\./|etc/passwd)</field>
+    <description>Directory traversal attempt detected on Nginx web server</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <rule id="300002" level="12">
+    <if_matched_sid>31101</if_matched_sid>
+    <field name="data.url" type="pcre2">('|\%27|--|%23)</field>
+    <description>Possible SQL Injection attempt detected on Nginx</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- Mass access to electronic health records (simulated EHR application log) -->
+  <rule id="100100" level="14">
+    <if_matched_sid>31101</if_matched_sid>
+    <match>EHR ACCESS</match>
+    <description>HIPAA VIOLATION: Mass patient record access detected</description>
+    <group>hipaa_breach,phi_exposure,</group>
+  </rule>
+
+</group>
+
+<!-- Suricata alerts forwarded to Wazuh -->
+<group name="suricata,icmp,">
+
+  <rule id="100600" level="12">
+    <if_group>suricata</if_group>
+    <field name="alert.signature" type="pcre2">(?i)ICMP Flood</field>
+    <description>ICMP Flood attack detected by Suricata.</description>
+    <mitre>
+      <id>T1498</id>
+    </mitre>
+  </rule>
+
+</group>
+
+<group name="suricata,custom,icmp,">
+
+  <!-- Custom Suricata signatures used during lab testing -->
+  <rule id="100700" level="12">
+    <if_group>suricata</if_group>
+    <field name="alert.signature_id">10000002</field>
+    <description>Suricata CUSTOM ICMP Echo Request (Ping) detected.</description>
+    <mitre>
+      <id>T1018</id>
+    </mitre>
+  </rule>
+
+  <rule id="100701" level="12">
+    <if_group>suricata</if_group>
+    <field name="alert.signature_id">10000003</field>
+    <description>Suricata CUSTOM ICMP Echo Reply (Pong) detected.</description>
+  </rule>
+
+</group>

@@ -1,0 +1,5 @@
+ai/data/
+*.csv
+*.pkl
+.ipynb_checkpoints/
+__pycache__/
